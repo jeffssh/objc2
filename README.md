@@ -1,12 +1,13 @@
 # objc2
-C2 using the full power of NSExpressions to replace in memory dylib loading
+Restoring the power of NSExpressions to replace in memory dylib loading.
+Works, but very limited due to inability to pass doubles/floats/other data
+types that use different data types. As an example, a double return value will
+be placed in d0 normally, but the NSFunctionExpression implementation always
+stores the return value in x0. This makes the usable calls very limited
 
 
-## Expected testing output
-```bash
-make run
-gcc -framework Foundation -o objc2-harness ./ObjC2/main.m
-./objc2.py | ./objc2-harness
-2024-04-25 22:16:19.412 objc2-harness[52705:970871] Calling [[NSFileHandle fileHandleWithStandardOutput] writeData:] with NSExpressions!
-!!!!! hello from function expression! !!!!!!
+# To generate an AST, create an NSExpression, then test using the harness
 ```
+TARGET_FILE=./objc-payloads/read-etc-passwd.m make ast
+```
+
