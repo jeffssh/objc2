@@ -158,6 +158,11 @@ uintptr_t getAddressOfSection(const char *imageName, const char *sectionName) {
 }
 
 
+void* returnEmptyDict(void) {
+    return (__bridge void*) [[NSDictionary alloc] init];
+}
+
+
 void enableArbitratyNSFunctionExpressionsMacOS135(void) {
     int countOffset = 0x10;
     void *coreFoundationHandle = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_NOW);
@@ -265,6 +270,11 @@ void enableArbitratyNSFunctionExpressionsMacOS1441(void) {
     orig_method_getArgumentType = dlsym(dylib, "method_getArgumentType");
     orig_method_getReturnType = dlsym(dylib, "method_getReturnType");
     dlclose(dylib);
+    dylib = dlopen("/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation", RTLD_NOW);
+    dictRetFunction _CFPredicatePolicyRestrictedClasses = dlsym(dylib, "_CFPredicatePolicyRestrictedClasses");
+    dictRetFunction _CFPredicatePolicyRestrictedSelectors = dlsym(dylib, "_CFPredicatePolicyRestrictedSelectors");
+    dlclose(dylib);
+    
     installHookViaGotOverwrite(@"/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
                                @"__auth_got",
                                orig_objc_retain,
@@ -281,6 +291,23 @@ void enableArbitratyNSFunctionExpressionsMacOS1441(void) {
                                @"__auth_got",
                                orig_method_getReturnType,
                                &custom_method_getReturnType);
+    installHookViaGotOverwrite(@"/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+                               @"__auth_got",
+                               orig_method_getReturnType,
+                               &custom_method_getReturnType);
+    
+    // ensure loaded in the GOT
+    _CFPredicatePolicyRestrictedClasses();
+    // br s -a 0x19ebf57c4
+    installHookViaGotOverwrite(@"/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+                               @"__auth_got",
+                               _CFPredicatePolicyRestrictedClasses,
+                               &returnEmptyDict);
+    _CFPredicatePolicyRestrictedSelectors();
+    installHookViaGotOverwrite(@"/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+                               @"__auth_got",
+                               _CFPredicatePolicyRestrictedSelectors,
+                               &returnEmptyDict);
 }
 
 
@@ -290,7 +317,7 @@ int main(int argc, const char * argv[]) {
         enableArbitratyNSFunctionExpressionsMacOS1441();
         NSString *nullAllocExpression  = @"FUNCTION(CAST('NSNull','Class'), 'alloc')";
         NSString *logNSFunctionExpression  = @"FUNCTION(FUNCTION(CAST('NSFileHandle','Class'), 'fileHandleWithStandardOutput'), 'writeData:', FUNCTION('!!!!! hello from function expression! !!!!!!\\n', 'dataUsingEncoding:', FUNCTION(2,'intValue')))";
-        NSString *complexLogExpression = @"FUNCTION(CAST('NSNull','Class'), 'alloc', FUNCTION(FUNCTION(CAST('NSFileHandle','Class'), 'fileHandleWithStandardOutput'), 'writeData:', FUNCTION('!!!!! hello from function expression! !!!!!!\\n', 'dataUsingEncoding:', FUNCTION(2,'intValue'))), FUNCTION(FUNCTION(CAST('NSFileHandle','Class'), 'fileHandleWithStandardOutput'), 'writeData:', FUNCTION('!!!!! hello from function expression! !!!!!!\\n', 'dataUsingEncoding:', FUNCTION(2,'intValue'))))";
+        NSString *complexLogExpression = @"FUNCTION(CAST('NSNull','Class'), 'alloc', FUNCTION(FUNCTION(CAST('NSFileHandle','Class'), 'fileHandleWithStandardOutput'), 'writeData:', FUNCTION('!!!!! hello from function expression! !!!!!!\\n', 'dataUsingEncoding:', FUNCTION('0x2','intValue'))), FUNCTION(FUNCTION(CAST('NSFileHandle','Class'), 'fileHandleWithStandardOutput'), 'writeData:', FUNCTION('!!!!! hello from function expression! !!!!!!\\n', 'dataUsingEncoding:', FUNCTION(2,'intValue'))))";
 
         bool readFromStdin = YES;
         NSExpression *expression;
@@ -302,12 +329,9 @@ int main(int argc, const char * argv[]) {
         } else {
             expression = [NSExpression expressionWithFormat:complexLogExpression];
         }
-
-        NSLog(@"Calling [[NSFileHandle fileHandleWithStandardOutput] writeData:] with NSExpressions!");
         NSMutableDictionary* ctx = [NSMutableDictionary new];
         [expression expressionValueWithObject:nil context:ctx];
+        NSLog(@"Done calling supplied NSExpressions!");
     }
     return 0;
-//    dyld_program_sdk_at_least();
 }
-
