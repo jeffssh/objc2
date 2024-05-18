@@ -7,8 +7,8 @@ stores the return value in x0. This makes the usable calls very limited
 
 
 # To generate an AST, create an NSExpression, then test using the harness
-```
-[objc2] TARGET_FILE=./objc-payloads/read-etc-passwd.m make ast       
+```bash
+$ TARGET_FILE=./objc-payloads/read-etc-passwd.m make ast       
 gcc -framework Foundation -o objc2-harness ./ObjC2/main.m
 mkdir build
 echo ./objc-payloads/read-etc-passwd.m
